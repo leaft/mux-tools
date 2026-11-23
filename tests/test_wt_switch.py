@@ -127,6 +127,21 @@ class WorktreeSwitchTests(unittest.TestCase):
         self.run_script()
         self.assertEqual(len(self.host()['tabs']), 1)
 
+    def test_managed_tab_is_not_adopted_by_another_worktree(self):
+        for host in ['rex', 'herdr']:
+            with self.subTest(host=host):
+                self.write_host({'tabs': []})
+                self.run_script(self.command(host))
+                data = self.host()
+                original_id = data['tabs'][0]['id']
+                data['tabs'][0]['cwd'] = str(self.repo)
+                self.write_host(data)
+                self.run_script(self.command(host, target=self.repo))
+                self.assertEqual(len(self.host()['tabs']), 2)
+                self.assertNotEqual(self.host()['focused'], original_id)
+                self.run_script(self.command(host))
+                self.assertEqual(self.host()['focused'], original_id)
+
     def test_closed_tab_is_recreated(self):
         self.run_script()
         self.write_host({'tabs': []})
@@ -222,6 +237,30 @@ class WorktreeSwitchTests(unittest.TestCase):
     def test_missing_host_context_reports_actionable_error(self):
         result = self.run_script(['/bin/bash', str(SCRIPT), '--cwd', str(self.repo), '--path', str(self.feature)], success=False)
         self.assertIn('pass --host', result.stderr)
+
+    def test_control_character_inputs_are_rejected(self):
+        newline_dir = Path(str(self.feature) + '\n')
+        newline_dir.mkdir()
+        self.addCleanup(newline_dir.rmdir)
+        alias = self.tmp / 'newline-alias'
+        alias.symlink_to(newline_dir, target_is_directory=True)
+        cases = [
+            ['--cwd', str(self.repo), '--host', 'rex', '--path', str(alias)],
+            ['--cwd', str(self.repo) + '\n', '--list'],
+            ['--cwd', self.repo.as_uri() + '%0A', '--list'],
+            ['--cwd', str(self.repo), '--host', 'rex', '--path', str(self.feature) + '\n'],
+        ]
+        for arguments in cases:
+            with self.subTest(arguments=arguments):
+                self.run_script(['/bin/bash', str(SCRIPT), *arguments], success=False)
+        self.assertEqual(self.host()['tabs'], [])
+
+    def test_discovered_control_character_worktree_is_omitted(self):
+        path = self.tmp / 'bad\nworktree'
+        self.git('-C', str(self.repo), 'worktree', 'add', '--detach', str(path))
+        self.addCleanup(self.git, '-C', str(self.repo), 'worktree', 'remove', str(path))
+        result = self.run_script(['/bin/bash', str(SCRIPT), '--cwd', str(self.repo), '--list'])
+        self.assertNotIn(str(path), [entry['path'] for entry in json.loads(result.stdout)])
 
     def test_unknown_arguments_and_missing_values_fail(self):
         for args in [['--oops'], ['--host'], ['--host', 'unsupported']]:

@@ -91,14 +91,17 @@ decode_path() {
         done
         value=$decoded
     fi
-    # Control characters cannot be represented safely in a one-line picker.
+    # grep processes lines, so check LF explicitly before command substitution
+    # could strip a trailing newline and accidentally select a different path.
+    [[ $value != *$'\n'* ]] || return 1
+    # Other control characters cannot be represented safely in a one-line picker.
     if printf '%s' "$value" | LC_ALL=C grep -q '[[:cntrl:]]'; then return 1; fi
     printf '%s\n' "$value"
 }
 canonical_dir() {
     local value
     value=$(decode_path "$1") || return 1
-    (cd -- "$value" 2>/dev/null && pwd -P)
+    (cd -P -- "$value" 2>/dev/null && decode_path "$PWD")
 }
 source_dir=$(canonical_dir "$source_dir") || fail 'Repository directory is unavailable or contains control characters'
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/mux-tools.XXXXXXXX")
@@ -232,6 +235,8 @@ if [[ -z $id ]]; then
     if [[ $host == rex ]]; then
         jq -r '.windows[] | .window_id as $w | .layers[] | select(.kind=="tiled") | .blocks[] | select(.creator_name=="com.superlogical.terminal") | [$w,.block_id] | @tsv' "$scratch/topology.json" > "$scratch/terminals"
         while IFS=$'\t' read -r tab terminal; do
+            # A registered tab retains its original worktree even after cd.
+            if jq -e --arg id "$tab" 'any(.tabs[]; .==$id)' "$scratch/state.json" >/dev/null; then continue; fi
             pwd_json=$("$rex_bin" block call -s "$scope" -b "$terminal" pwd 2>/dev/null) || continue
             cwd=$(printf '%s' "$pwd_json" | jq -er '.pwd | select(type=="string")') || continue
             if same_worktree "$cwd"; then id=$tab; break; fi
@@ -239,6 +244,8 @@ if [[ -z $id ]]; then
     else
         jq -r --arg s "$scope" '.spaces[] | select(.id==$s) | .tabs[] | .id as $t | .terminals[] | [$t,.terminal] | @tsv' "$scratch/topology.json" > "$scratch/terminals"
         while IFS=$'\t' read -r tab terminal; do
+            # A registered tab retains its original worktree even after cd.
+            if jq -e --arg id "$tab" 'any(.tabs[]; .==$id)' "$scratch/state.json" >/dev/null; then continue; fi
             terminal_json=$("$hc_bin" get "$terminal" --json 2>/dev/null) || continue
             cwd=$(printf '%s' "$terminal_json" | jq -er '.foreground.cwd // .cwd | select(type=="string")') || continue
             if same_worktree "$cwd"; then id=$tab; break; fi
