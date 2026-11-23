@@ -156,6 +156,14 @@ class WorktreeSwitchTests(unittest.TestCase):
         self.run_script()
         self.assertEqual(len(self.host()['tabs']), 2)
 
+    def test_host_cwd_with_trailing_newline_is_not_adopted(self):
+        for host in ['rex', 'herdr']:
+            with self.subTest(host=host):
+                self.write_host({'tabs': [self.tab(host, Path(str(self.feature) + '\n'))]})
+                self.run_script(self.command(host))
+                self.assertEqual(len(self.host()['tabs']), 2)
+                self.assertNotEqual(self.host()['focused'], self.tab(host)['id'])
+
     def test_symlink_selects_the_canonical_worktree(self):
         alias = self.tmp / 'alias'
         alias.symlink_to(self.feature, target_is_directory=True)

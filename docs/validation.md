@@ -4,8 +4,8 @@
 
 ## 自动化检查
 
-- `make check`：Bash 语法、ShellCheck、27 项自动化测试全部通过。
-- 提交后审查发现的标签页关联复用与换行路径问题均先用回归测试复现，再修复；覆盖两端宿主及原始路径、file URL、符号链接、worktree 列表入口。
+- `make check`：Bash 语法、ShellCheck、28 项自动化测试全部通过。
+- 提交后审查发现的标签页关联复用与换行路径问题均先用回归测试复现，再修复；覆盖两端宿主及原始路径、file URL、符号链接、worktree 列表及宿主返回的目录入口。
 - `zsh -n integrations/zsh.zsh`：通过。
 - `rex config check integrations/rex.lua --json`：1 个 action、1 个绑定，0 条诊断。
 - 测试使用真实临时 Git 仓库及 jq/fzf；CLI 替身模拟宿主协议，包括异常和并发场景，不冒充真实 App。

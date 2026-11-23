@@ -238,7 +238,7 @@ if [[ -z $id ]]; then
             # A registered tab retains its original worktree even after cd.
             if jq -e --arg id "$tab" 'any(.tabs[]; .==$id)' "$scratch/state.json" >/dev/null; then continue; fi
             pwd_json=$("$rex_bin" block call -s "$scope" -b "$terminal" pwd 2>/dev/null) || continue
-            cwd=$(printf '%s' "$pwd_json" | jq -er '.pwd | select(type=="string")') || continue
+            cwd=$(printf '%s' "$pwd_json" | jq -er '.pwd | select(type=="string") | select(contains("\n")|not)') || continue
             if same_worktree "$cwd"; then id=$tab; break; fi
         done < "$scratch/terminals"
     else
@@ -247,7 +247,7 @@ if [[ -z $id ]]; then
             # A registered tab retains its original worktree even after cd.
             if jq -e --arg id "$tab" 'any(.tabs[]; .==$id)' "$scratch/state.json" >/dev/null; then continue; fi
             terminal_json=$("$hc_bin" get "$terminal" --json 2>/dev/null) || continue
-            cwd=$(printf '%s' "$terminal_json" | jq -er '.foreground.cwd // .cwd | select(type=="string")') || continue
+            cwd=$(printf '%s' "$terminal_json" | jq -er '.foreground.cwd // .cwd | select(type=="string") | select(contains("\n")|not)') || continue
             if same_worktree "$cwd"; then id=$tab; break; fi
         done < "$scratch/terminals"
     fi
